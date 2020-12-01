@@ -1,3 +1,13 @@
 <resources>
-    <string name="app_name">Weather app</string>
+    <string name="app_name">LabB1 Weather App</string>
+    <string name="downloading_msg">Fetching weather data…</string>
+    <string name="approved_time_text">Approved time</string>
+    <string name="longitude_text">Longitude</string>
+    <string name="latitude_text">Latitude</string>
+    <string name="longitude_input_hint">Longitude</string>
+    <string name="latitude_input_hint">Latitude</string>
+    <string name="get_weather_button">Get weather</string>
+    <string name="approved_time_recycleView_text">Approved time</string>
+    <string name="clouds_recycleView_text">Clouds</string>
+    <string name="temperature_recycleView_text">Temperature</string>
 </resources>
