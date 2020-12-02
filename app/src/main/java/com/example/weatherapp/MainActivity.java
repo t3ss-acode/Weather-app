@@ -27,7 +27,12 @@ import com.example.weatherapp.serialize.DeserializeFromFile;
 import com.example.weatherapp.serialize.SerializeToFile;
 
 import org.json.JSONObject;
+
+import java.io.File;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
@@ -40,11 +45,8 @@ public class MainActivity extends AppCompatActivity {
     private static final long HOURLY_REFRESH_TIMEOUT = 3_600_000;
 
 
-
-
     // data
     private List<Weather> weatherList;
-    private static long lastDownload = 0;
     private String lastLon = "";
     private String lastLat = "";
     private StringBuilder stringBuilder;
@@ -61,6 +63,38 @@ public class MainActivity extends AppCompatActivity {
 
     // Volley
     private RequestQueue mRequestQueue;
+    // executed on main thread
+    private Response.Listener<JSONObject> responseListener = new Response.Listener<JSONObject>() {
+        @Override
+        public void onResponse(JSONObject responseObj) {
+            Log.d(LOG_TAG, "got response");
+
+            try {
+                Log.d(LOG_TAG, "onRepsonse: " + responseObj);
+
+                List<Weather> newWeather = new ArrayList<>();
+                new WeatherParser(mWeatherAdapter, approvedTimeTextView, lonTextView, latTextView, lastLon, lastLat).execute(responseObj);
+                loadedDataTextView.setVisibility(View.INVISIBLE);
+
+                mLonInput.setText(lastLon);
+                mLatInput.setText(lastLat);
+
+
+                // cancel pending requests
+                mRequestQueue.cancelAll(this);
+            } catch (Exception e) {
+                showToast("Unable to parse data");
+                Log.i("error while parsing", e.toString());
+            }
+        }
+    };
+    private Response.ErrorListener errorListener = new Response.ErrorListener() {
+        @Override
+        public void onErrorResponse(VolleyError error) {
+            showToast("Volley error");
+            Log.i("Volley error", error.toString());
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,46 +134,76 @@ public class MainActivity extends AppCompatActivity {
                 loadedDataTextView.setVisibility(View.VISIBLE);
             }
         }
-
-
-
     }
 
     @Override
     protected void onStart() {
+        Log.d(LOG_TAG, "in onStart");
+        float latFloat = Float.parseFloat("15.");
+        Log.d(LOG_TAG, Float.toString(latFloat));
+        super.onStart();
 
         //all kolla nätverk här istället för i onCreate
         //läs bara från fil om det finns en fil
         //Om vi inte har en fil och inte har nätverk
         //I den metoden som hämta data, så fort vi hämtat data så skriv ner det i filen
 
-        /*
+
         // Check the status of the network connection.
         ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo networkInfo = null;
-        if(connMgr != null) {
+        if (connMgr != null) {
             networkInfo = connMgr.getActiveNetworkInfo();
         }
 
-        //If there is no connection, get saved weather data if there is any
-        if (networkInfo == null || !networkInfo.isConnected()) {
+        //If there is internet connection, get fresh data if an hour has passed
+        // or if it is loaded data then get if 10 min has passed
+        if (networkInfo != null && networkInfo.isConnected()) {
+            if(!approvedTimeTextView.getText().equals("Approved time")) {
+                if(timeForNewDownload(HOURLY_REFRESH_TIMEOUT)) {
+                    automaticDownload = true;
+                    downloadWeather(null);
+                    Log.d(LOG_TAG, "time to update after an hour");
+                }else {
+                    Log.d(LOG_TAG, "an hour hasn't passed");
+                }
+            }else if (loadedDataTextView.getVisibility() == View.VISIBLE) {
+                if (timeForNewDownload(NO_CONNECTION_TIMEOUT)) {
+                    automaticDownload = true;
+                    downloadWeather(null);
+                    Log.d(LOG_TAG, "time to update after loaded data");
+                }else {
+                    Log.d(LOG_TAG, "Wait some more loaded");
+                }
+            }
+        } else {
             File file = new File(this.getFilesDir(), FILENAME);
-            if(file.length() > 0) {
+            if (file.length() > 0) {
                 loadedDataTextView.setVisibility(View.VISIBLE);
                 new DeserializeFromFile(mWeatherAdapter, approvedTimeTextView, lonTextView, latTextView).execute(this.getFilesDir());
+            } else {
+                showToast("No stored data to load");
             }
         }
-        */
-
-        super.onStart();
-
     }
 
-    private boolean isTimeForNewDownload(long timeLimit) {
-        if ((System.currentTimeMillis() - lastDownload) > timeLimit) { // 10 min
-            return true;
+    private boolean timeForNewDownload(long timeLimit) {
+
+        try {
+            SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            Date lastDownloadDate = formatter.parse(approvedTimeTextView.getText().toString());
+            Log.d(LOG_TAG, System.currentTimeMillis() + " ," + lastDownloadDate.getTime());
+            if ((System.currentTimeMillis() - lastDownloadDate.getTime()) > timeLimit) { // 10 min
+                Log.d(LOG_TAG, "Time to update");
+                return true;
+            }
+            Log.d(LOG_TAG, "not enough time has passed");
+            return false;
+        } catch (ParseException e) {
+            Log.d(LOG_TAG, "not able to parse date");
+            e.printStackTrace();
+            return false;
         }
-        return false;
     }
 
     @Override
@@ -150,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
         //volley stop pending request. Ta bort resten i kön
         //påmin under redovisningen om lab parter. Vilka som också redovisat lab 1 och söker partner
         getApplicationContext();
-        if(weatherList.size() > 0) {
+        if (weatherList.size() > 0) {
             SerializeToFile.SaveWeather(weatherList, approvedTimeTextView.getText().toString(),
                     latTextView.getText().toString(), lonTextView.getText().toString(), this.getFilesDir());
         }
@@ -174,17 +238,17 @@ public class MainActivity extends AppCompatActivity {
         //Get the values for lat and lon depending on what called the download
         String lonQueryString;
         String latQueryString;
-        if(automaticDownload) {
+        if (automaticDownload) {
             lonQueryString = lonTextView.getText().toString();
             latQueryString = latTextView.getText().toString();
-        }else {
+        } else {
             lonQueryString = mLonInput.getText().toString();
             latQueryString = mLatInput.getText().toString();
         }
 
 
         // Hide the keyboard when the button is pushed.
-        if(!automaticDownload) {
+        if (!automaticDownload) {
             InputMethodManager inputManager = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
             if (inputManager != null) {
                 inputManager.hideSoftInputFromWindow(view.getWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
@@ -201,8 +265,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (networkInfo != null && networkInfo.isConnected()) {
-            if(lonQueryString.length() != 0 && latQueryString.length() != 0) {
-                if(!inputInvalid(lonQueryString, latQueryString)) {
+            if (lonQueryString.length() != 0 && latQueryString.length() != 0) {
+                if (!inputInvalid(lonQueryString, latQueryString)) {
                     //Create the url with the given lon and lat
                     String url = createURL(lonQueryString, latQueryString);
 
@@ -211,15 +275,15 @@ public class MainActivity extends AppCompatActivity {
                     lastLat = latQueryString;
                     postVolleyRequest(url);
                     Log.d(LOG_TAG, "downloading...");
-                }else {
+                } else {
                     showToast("Invalid input");
                     Log.d(LOG_TAG, "Invalid input");
                 }
-            }else {
+            } else {
                 showToast("Please enter longitude and latitude");
                 Log.d(LOG_TAG, "Please enter longitude and latitude");
             }
-        }else {
+        } else {
             showToast("Unable to connect to the internet");
             Log.d(LOG_TAG, "Unable to connect to the internet");
         }
@@ -227,23 +291,24 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean inputInvalid(String lon, String lat) {
         try {
+            String dot = ".";
             float lonFloat = Float.parseFloat(lon);
             float latFloat = Float.parseFloat(lat);
 
-            String lastLon = Character.toString(lon.charAt(lon.length() -1));
-            String lastLat = Character.toString(lat.charAt(lat.length() -1));
+            String lastLon = Character.toString(lon.charAt(lon.length() - 1));
+            String lastLat = Character.toString(lat.charAt(lat.length() - 1));
 
-            if(lonFloat < 0 || latFloat < 0) {
+            if (lonFloat < 0 || latFloat < 0) {
                 return true;
             }
-            Log.d(LOG_TAG, lastLon + ", " + lastLat);
-            if(!lastLon.equals(".") && !lastLat.equals(".")) {
-                Log.d(LOG_TAG, lastLon + ", " + lastLat);
+            //
+            if (lon.contains(dot) && !lastLon.equals(dot) && lat.contains(dot) && !lastLat.equals(dot)) {
                 return false;
-            }else {
+            } else {
+                Log.d(LOG_TAG, "not a float value");
                 return true;
             }
-        } catch(Exception e) {
+        } catch (Exception e) {
             showToast("Invalid input");
             Log.d(LOG_TAG, "Unable to parse lon and lat input");
             return true;
@@ -269,7 +334,6 @@ public class MainActivity extends AppCompatActivity {
         toast.show();
     }
 
-
     protected void postVolleyRequest(String url) {
         JsonObjectRequest weatherRequest = new JsonObjectRequest(
                 Request.Method.GET,
@@ -280,42 +344,4 @@ public class MainActivity extends AppCompatActivity {
         weatherRequest.setTag(this); // mark this request, might have to cancel it in onStop
         mRequestQueue.add(weatherRequest); // Volley processes the request on a worker thread
     }
-
-    // executed on main thread
-    private Response.Listener<JSONObject> responseListener = new Response.Listener<JSONObject>() {
-        @Override
-        public void onResponse(JSONObject responseObj) {
-            Log.d(LOG_TAG, "got response");
-
-            try {
-                Log.d(LOG_TAG, "onRepsonse: " + responseObj);
-
-                List<Weather> newWeather = new ArrayList<>();
-                new WeatherParser(mWeatherAdapter, approvedTimeTextView, lonTextView, latTextView, lastLon, lastLat).execute(responseObj);
-                loadedDataTextView.setVisibility(View.INVISIBLE);
-
-                lastDownload = System.currentTimeMillis();
-                mLonInput.setText(lastLon);
-                mLatInput.setText(lastLat);
-
-                lastDownload = System.currentTimeMillis();
-
-
-
-                // cancel pending requests
-                mRequestQueue.cancelAll(this);
-            } catch (Exception e) {
-                showToast("Unable to parse data");
-                Log.i("error while parsing", e.toString());
-            }
-        }
-    };
-
-    private Response.ErrorListener errorListener = new Response.ErrorListener() {
-        @Override
-        public void onErrorResponse(VolleyError error) {
-            showToast("Volley error");
-            Log.i("Volley error", error.toString());
-        }
-    };
 }

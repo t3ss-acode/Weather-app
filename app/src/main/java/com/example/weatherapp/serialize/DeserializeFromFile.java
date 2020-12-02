@@ -12,7 +12,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.lang.ref.WeakReference;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class DeserializeFromFile extends AsyncTask<File , Void, ArrayList<Object>> {
@@ -74,6 +77,9 @@ public class DeserializeFromFile extends AsyncTask<File , Void, ArrayList<Object
 
         if(deserializedData.size() > 0) {
             String approvedTime = (String) deserializedData.get(0);
+
+
+
             String lat = (String) deserializedData.get(1);
             String lon = (String) deserializedData.get(2);
 
