@@ -21,6 +21,7 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.example.weatherapp.model.Coordinates;
 import com.example.weatherapp.model.Weather;
 import com.example.weatherapp.model.WeatherList;
 import com.example.weatherapp.serialize.DeserializeFromFile;
@@ -108,11 +109,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-
-        //all kolla nätverk här istället för i onCreate
-        //läs bara från fil om det finns en fil
-        //Om vi inte har en fil och inte har nätverk
         //I den metoden som hämta data, så fort vi hämtat data så skriv ner det i filen
+        //påmin under redovisningen om lab parter. Vilka som också redovisat lab 1 och söker partner
 
 
         // Check the status of the network connection.
@@ -125,21 +123,23 @@ public class MainActivity extends AppCompatActivity {
         //If there is internet connection, get fresh data if an hour has passed
         // or if it is loaded data then get if 10 min has passed
         if (networkInfo != null && networkInfo.isConnected()) {
-            if(!approvedTimeTextView.getText().equals("Approved time")) {
-                if(timeForNewDownload(HOURLY_REFRESH_TIMEOUT)) {
-                    automaticDownload = true;
-                    downloadWeather(null);
-                    Log.d(LOG_TAG, "time to update after an hour");
-                }else {
-                    Log.d(LOG_TAG, "an hour hasn't passed");
-                }
-            }else if (loadedDataTextView.getVisibility() == View.VISIBLE) {
+            //If the data has been loaded, refresh data after 10 min
+            if (loadedDataTextView.getVisibility() == View.VISIBLE) {
                 if (timeForNewDownload(NO_CONNECTION_TIMEOUT)) {
                     automaticDownload = true;
                     downloadWeather(null);
                     Log.d(LOG_TAG, "time to update after loaded data");
                 }else {
                     Log.d(LOG_TAG, "Wait some more loaded");
+                }
+            //If there is a download time to compare to, refresh data after 1 hour
+            }else if(!(Coordinates.getApprovedTimeString() == null)) {
+                if(timeForNewDownload(HOURLY_REFRESH_TIMEOUT)) {
+                    automaticDownload = true;
+                    downloadWeather(null);
+                    Log.d(LOG_TAG, "time to update after an hour");
+                }else {
+                    Log.d(LOG_TAG, "an hour hasn't passed");
                 }
             }
         } else {
@@ -154,20 +154,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private boolean timeForNewDownload(long timeLimit) {
-
-        try {
-            SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-            Date lastDownloadDate = formatter.parse(approvedTimeTextView.getText().toString());
-            Log.d(LOG_TAG, System.currentTimeMillis() + " ," + lastDownloadDate.getTime());
-            if ((System.currentTimeMillis() - lastDownloadDate.getTime()) > timeLimit) { // 10 min
-                Log.d(LOG_TAG, "Time to update");
-                return true;
-            }
-            Log.d(LOG_TAG, "not enough time has passed");
+        if(Coordinates.getApprovedTimeMillis() == null) {
+            Log.d(LOG_TAG, "No time to compare to");
             return false;
-        } catch (ParseException e) {
-            Log.d(LOG_TAG, "not able to parse date");
-            e.printStackTrace();
+        }else if(System.currentTimeMillis() - Coordinates.getApprovedTimeMillis() > timeLimit) {
+            Log.d(LOG_TAG, "Time to update");
+            return true;
+        }else {
+            Log.d(LOG_TAG, "not enough time has passed");
             return false;
         }
     }
@@ -178,11 +172,9 @@ public class MainActivity extends AppCompatActivity {
         // Volley, cancel pending requests
         mRequestQueue.cancelAll(this);
         //volley stop pending request. Ta bort resten i kön
-        //påmin under redovisningen om lab parter. Vilka som också redovisat lab 1 och söker partner
-        getApplicationContext();
+
         if (weatherList.size() > 0) {
-            SerializeToFile.SaveWeather(weatherList, approvedTimeTextView.getText().toString(),
-                    latTextView.getText().toString(), lonTextView.getText().toString(), this.getFilesDir());
+            SerializeToFile.SaveWeather(this.getFilesDir());
         }
     }
 
@@ -205,8 +197,8 @@ public class MainActivity extends AppCompatActivity {
         String lonQueryString;
         String latQueryString;
         if (automaticDownload) {
-            lonQueryString = lonTextView.getText().toString();
-            latQueryString = latTextView.getText().toString();
+            lonQueryString = Coordinates.getLongitude();
+            latQueryString = Coordinates.getLatitude();
         } else {
             lonQueryString = mLonInput.getText().toString();
             latQueryString = mLatInput.getText().toString();
@@ -232,7 +224,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (networkInfo != null && networkInfo.isConnected()) {
             if (lonQueryString.length() != 0 && latQueryString.length() != 0) {
-                if (!inputInvalid(lonQueryString, latQueryString)) {
+                if (validInput(lonQueryString, latQueryString)) {
                     //Create the url with the given lon and lat
                     String url = createURL(lonQueryString, latQueryString);
 
@@ -255,7 +247,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private boolean inputInvalid(String lon, String lat) {
+    private boolean validInput(String lon, String lat) {
         try {
             String dot = ".";
             float lonFloat = Float.parseFloat(lon);
@@ -264,22 +256,38 @@ public class MainActivity extends AppCompatActivity {
             String lastLon = Character.toString(lon.charAt(lon.length() - 1));
             String lastLat = Character.toString(lat.charAt(lat.length() - 1));
 
-            if (lonFloat < 0 || latFloat < 0) {
-                return true;
-            }
-            //
             if (lon.contains(dot) && !lastLon.equals(dot) && lat.contains(dot) && !lastLat.equals(dot)) {
-                return false;
+                if(withinRange(lonFloat, latFloat)) {
+                    return true;
+                }else {
+                    showToast("Outside of range");
+                    return false;
+                }
             } else {
+                showToast("Incorrect input");
                 Log.d(LOG_TAG, "not a float value");
-                return true;
+                return false;
             }
         } catch (Exception e) {
-            showToast("Invalid input");
+            showToast("Not a float value");
             Log.d(LOG_TAG, "Unable to parse lon and lat input");
-            return true;
+            return false;
         }
     }
+
+    private boolean withinRange(Float lon, Float lat) {
+        //Latitude between -90 and 90
+        //Longitude between -180 and 180
+        if(lon < -180 || lon > 180) {
+            return false;
+        }
+        if(lat < -90 || lat > 90) {
+            return false;
+        }
+
+        return true;
+    }
+
 
     private String createURL(String lon, String lat) {
         stringBuilder.delete(0, stringBuilder.length());

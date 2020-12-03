@@ -88,6 +88,8 @@ public class DeserializeFromFile extends AsyncTask<File , Void, ArrayList<Object
 
             Coordinates.setApprovedTimeMillis(approvedTimeMillis);
             Coordinates.setApprovedTimeString(approvedTimeString);
+            Coordinates.setLatitude(lat);
+            Coordinates.setLongitude(lon);
 
             mWeatherAdapter.get().notifyDataSetChanged();
             mLastApprovedTime.get().setText(approvedTimeString);

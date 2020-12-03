@@ -36,8 +36,8 @@ public class WeatherParser extends AsyncTask<JSONObject, Void, List<Weather>> {
     private WeakReference<TextView> mLonTextView;
     private WeakReference<TextView> mLatTextView;
     private String approvedTime;
-    private String lastLon = "";
-    private String lastLat = "";
+    private String lastLon;
+    private String lastLat;
 
     private StringBuilder builder;
 
@@ -66,7 +66,14 @@ public class WeatherParser extends AsyncTask<JSONObject, Void, List<Weather>> {
             //clear the list and add the new items to the list
             mWeatherList.get().clear();
             mWeatherList.get().addAll(getWeatherList(jsonObjects[0]));
+
             approvedTime = getApprovedTime(jsonObjects[0]);
+
+            Coordinates.setApprovedTimeString(approvedTime);
+            Coordinates.setApprovedTimeMillis(System.currentTimeMillis());
+            Coordinates.setLatitude(lastLat);
+            Coordinates.setLongitude(lastLon);
+
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -77,9 +84,6 @@ public class WeatherParser extends AsyncTask<JSONObject, Void, List<Weather>> {
     @Override
     protected void onPostExecute(List<Weather> weathers) {
         super.onPostExecute(weathers);
-
-        Coordinates.setApprovedTimeString(approvedTime);
-        Coordinates.setApprovedTimeMillis(System.currentTimeMillis());
 
         mWeatherAdapter.get().notifyDataSetChanged();
 

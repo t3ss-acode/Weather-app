@@ -3,10 +3,8 @@ package com.example.weatherapp.model;
 public class Coordinates {
     private static Long approvedTimeMillis;
     private static String approvedTimeString;
-    //Between -90 and 90
-    private static Float latitude;
-    //Between -180 and 180
-    private static Float longitude;
+    private static String latitude;
+    private static String longitude;
 
 
     private Coordinates() {}
@@ -29,20 +27,20 @@ public class Coordinates {
     }
 
 
-    public static Float getLatitude() {
+    public static String getLatitude() {
         return latitude;
     }
 
-    public static void setLatitude(Float lat) {
+    public static void setLatitude(String lat) {
         latitude = lat;
     }
 
 
-    public static Float getLongitude() {
+    public static String getLongitude() {
         return longitude;
     }
 
-    public static void setLongitude(Float lon) {
+    public static void setLongitude(String lon) {
         longitude = lon;
     }
 }
