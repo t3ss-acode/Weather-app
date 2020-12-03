@@ -4,6 +4,7 @@ import android.os.AsyncTask;
 import android.widget.TextView;
 
 import com.example.weatherapp.WeatherAdapter;
+import com.example.weatherapp.model.Coordinates;
 import com.example.weatherapp.model.Weather;
 import com.example.weatherapp.model.WeatherList;
 
@@ -76,18 +77,20 @@ public class DeserializeFromFile extends AsyncTask<File , Void, ArrayList<Object
         System.out.println("tostring: " + deserializedData.toString());
 
         if(deserializedData.size() > 0) {
-            String approvedTime = (String) deserializedData.get(0);
+            Long approvedTimeMillis = (Long) deserializedData.get(0);
+            String approvedTimeString = (String) deserializedData.get(1);
 
-
-
-            String lat = (String) deserializedData.get(1);
-            String lon = (String) deserializedData.get(2);
+            String lat = (String) deserializedData.get(2);
+            String lon = (String) deserializedData.get(3);
 
             mWeatherList.get().clear();
-            mWeatherList.get().addAll((List<Weather>) deserializedData.get(3));
+            mWeatherList.get().addAll((List<Weather>) deserializedData.get(4));
+
+            Coordinates.setApprovedTimeMillis(approvedTimeMillis);
+            Coordinates.setApprovedTimeString(approvedTimeString);
 
             mWeatherAdapter.get().notifyDataSetChanged();
-            mLastApprovedTime.get().setText(approvedTime);
+            mLastApprovedTime.get().setText(approvedTimeString);
             mLonTextView.get().setText(lon);
             mLatTextView.get().setText(lat);
 
@@ -95,7 +98,5 @@ public class DeserializeFromFile extends AsyncTask<File , Void, ArrayList<Object
         }else {
             System.out.println("No deserialized object");
         }
-
-
     }
 }

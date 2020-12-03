@@ -63,38 +63,7 @@ public class MainActivity extends AppCompatActivity {
 
     // Volley
     private RequestQueue mRequestQueue;
-    // executed on main thread
-    private Response.Listener<JSONObject> responseListener = new Response.Listener<JSONObject>() {
-        @Override
-        public void onResponse(JSONObject responseObj) {
-            Log.d(LOG_TAG, "got response");
 
-            try {
-                Log.d(LOG_TAG, "onRepsonse: " + responseObj);
-
-                List<Weather> newWeather = new ArrayList<>();
-                new WeatherParser(mWeatherAdapter, approvedTimeTextView, lonTextView, latTextView, lastLon, lastLat).execute(responseObj);
-                loadedDataTextView.setVisibility(View.INVISIBLE);
-
-                mLonInput.setText(lastLon);
-                mLatInput.setText(lastLat);
-
-
-                // cancel pending requests
-                mRequestQueue.cancelAll(this);
-            } catch (Exception e) {
-                showToast("Unable to parse data");
-                Log.i("error while parsing", e.toString());
-            }
-        }
-    };
-    private Response.ErrorListener errorListener = new Response.ErrorListener() {
-        @Override
-        public void onErrorResponse(VolleyError error) {
-            showToast("Volley error");
-            Log.i("Volley error", error.toString());
-        }
-    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -138,9 +107,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onStart() {
-        Log.d(LOG_TAG, "in onStart");
-        float latFloat = Float.parseFloat("15.");
-        Log.d(LOG_TAG, Float.toString(latFloat));
         super.onStart();
 
         //all kolla nätverk här istället för i onCreate
@@ -344,4 +310,36 @@ public class MainActivity extends AppCompatActivity {
         weatherRequest.setTag(this); // mark this request, might have to cancel it in onStop
         mRequestQueue.add(weatherRequest); // Volley processes the request on a worker thread
     }
+
+    // executed on main thread
+    private Response.Listener<JSONObject> responseListener = new Response.Listener<JSONObject>() {
+        @Override
+        public void onResponse(JSONObject responseObj) {
+            Log.d(LOG_TAG, "got response");
+
+            try {
+                Log.d(LOG_TAG, "onRepsonse: " + responseObj);
+
+                new WeatherParser(mWeatherAdapter, approvedTimeTextView, lonTextView, latTextView, lastLon, lastLat).execute(responseObj);
+                loadedDataTextView.setVisibility(View.INVISIBLE);
+
+                mLonInput.setText(lastLon);
+                mLatInput.setText(lastLat);
+
+
+                // cancel pending requests
+                mRequestQueue.cancelAll(this);
+            } catch (Exception e) {
+                showToast("Unable to parse data");
+                Log.i("error while parsing", e.toString());
+            }
+        }
+    };
+    private Response.ErrorListener errorListener = new Response.ErrorListener() {
+        @Override
+        public void onErrorResponse(VolleyError error) {
+            showToast("Volley error");
+            Log.i("Volley error", error.toString());
+        }
+    };
 }

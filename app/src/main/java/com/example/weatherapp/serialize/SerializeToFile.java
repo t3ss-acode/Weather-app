@@ -1,5 +1,6 @@
 package com.example.weatherapp.serialize;
 
+import com.example.weatherapp.model.Coordinates;
 import com.example.weatherapp.model.Weather;
 
 import java.io.File;
@@ -18,7 +19,8 @@ public class SerializeToFile {
     public static boolean SaveWeather(List<Weather> weatherList, String approvedTime, String lat, String lon, File directory) {
         ArrayList<Object> data = new ArrayList<>();
 
-        data.add(approvedTime);
+        data.add(Coordinates.getApprovedTimeMillis());
+        data.add(Coordinates.getApprovedTimeString());
         data.add(lat);
         data.add(lon);
         data.add(weatherList);

@@ -4,6 +4,7 @@ import android.os.AsyncTask;
 import android.util.Log;
 import android.widget.TextView;
 
+import com.example.weatherapp.model.Coordinates;
 import com.example.weatherapp.model.Weather;
 import com.example.weatherapp.model.WeatherList;
 
@@ -12,7 +13,10 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.lang.ref.WeakReference;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class WeatherParser extends AsyncTask<JSONObject, Void, List<Weather>> {
@@ -35,6 +39,10 @@ public class WeatherParser extends AsyncTask<JSONObject, Void, List<Weather>> {
     private String lastLon = "";
     private String lastLat = "";
 
+    private StringBuilder builder;
+
+
+
 
 
     //Get view elements when that comes
@@ -47,6 +55,8 @@ public class WeatherParser extends AsyncTask<JSONObject, Void, List<Weather>> {
 
         lastLon = lonStr;
         lastLat = latStr;
+
+        builder = new StringBuilder();
     }
 
     //Parse the JSON data
@@ -68,28 +78,45 @@ public class WeatherParser extends AsyncTask<JSONObject, Void, List<Weather>> {
     protected void onPostExecute(List<Weather> weathers) {
         super.onPostExecute(weathers);
 
+        Coordinates.setApprovedTimeString(approvedTime);
+        Coordinates.setApprovedTimeMillis(System.currentTimeMillis());
+
         mWeatherAdapter.get().notifyDataSetChanged();
-        mLastApprovedTime.get().setText(editTimeString(approvedTime));
+
+        mLastApprovedTime.get().setText(approvedTime);
         mLonTextView.get().setText(lastLon);
         mLatTextView.get().setText(lastLat);
-        //lastDownload = System.currentTimeMillis();
     }
 
+
     private String getApprovedTime(JSONObject jsonObject) throws JSONException {
-        return jsonObject.getString(APPROVEDTIME);
+
+        return editTimeString(jsonObject.getString(APPROVEDTIME));
+    }
+
+
+    private String editTimeString(String str) {
+        String timeStr = str.replace("T", " ");
+        timeStr = timeStr.replace("Z", "");
+        return timeStr;
     }
 
     private Weather getWeather(JSONObject jsonObj) throws JSONException {
+
+        builder.setLength(0);
 
         String timeStr;
         double temperature = Integer.MIN_VALUE;
         int cloudCoverage = Integer.MIN_VALUE;
 
         //Get time and date this weather takes place
-        timeStr = jsonObj.getString(VALIDTIME);
-
         // Remove the T and Z from 2020-11-22T19:00:00Z
-        timeStr = editTimeString(timeStr);
+        builder.append(jsonObj.getString(VALIDTIME));
+        builder.setCharAt(10, ' ');
+        builder.setCharAt(19, ' ');
+
+
+        //timeStr = editTimeString(timeStr);
 
         //Parameter arrays in the object
         JSONArray parameters = jsonObj.getJSONArray(PARAMTERES);
@@ -109,15 +136,8 @@ public class WeatherParser extends AsyncTask<JSONObject, Void, List<Weather>> {
                 cloudCoverage = values.getInt(0);
             }
         }
-        return new Weather(timeStr, temperature, cloudCoverage);
+        return new Weather(builder.toString(), temperature, cloudCoverage);
     }
-
-    private String editTimeString(String str) {
-        String timeStr = str.replace("T", " ");
-        timeStr = timeStr.replace("Z", "");
-        return timeStr;
-    }
-
 
     private List<Weather> getWeatherList(JSONObject weatherObj) throws JSONException {
         Log.d(LOG_TAG, "JSON: " + weatherObj);
