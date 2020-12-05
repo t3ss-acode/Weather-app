@@ -22,6 +22,7 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.example.weatherapp.model.Coordinates;
+import com.example.weatherapp.model.Logic;
 import com.example.weatherapp.model.Weather;
 import com.example.weatherapp.model.WeatherList;
 import com.example.weatherapp.serialize.DeserializeFromFile;
@@ -40,7 +41,6 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String LOG_TAG = MainActivity.class.getSimpleName();
 
-    private static final String WEATHER_URL_BASE = "https://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/";
     private static final String FILENAME = "saved_weather";
     private static final long NO_CONNECTION_TIMEOUT = 600_000;
     private static final long HOURLY_REFRESH_TIMEOUT = 3_600_000;
@@ -50,8 +50,8 @@ public class MainActivity extends AppCompatActivity {
     private List<Weather> weatherList;
     private String lastLon = "";
     private String lastLat = "";
-    private StringBuilder stringBuilder;
     private boolean automaticDownload = false;
+    private Logic logic;
 
     // ui
     private TextView approvedTimeTextView;
@@ -73,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
 
         // data
         weatherList = WeatherList.getInstance(); // get the singleton list
-        stringBuilder = new StringBuilder();
+        logic = new Logic();
 
         // ui
         approvedTimeTextView = findViewById(R.id.approved_time);
@@ -109,9 +109,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        //I den metoden som hämta data, så fort vi hämtat data så skriv ner det i filen
-        //påmin under redovisningen om lab parter. Vilka som också redovisat lab 1 och söker partner
-
 
         // Check the status of the network connection.
         ConnectivityManager connMgr = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
@@ -125,7 +122,7 @@ public class MainActivity extends AppCompatActivity {
         if (networkInfo != null && networkInfo.isConnected()) {
             //If the data has been loaded, refresh data after 10 min
             if (loadedDataTextView.getVisibility() == View.VISIBLE) {
-                if (timeForNewDownload(NO_CONNECTION_TIMEOUT)) {
+                if (logic.timeForNewDownload(NO_CONNECTION_TIMEOUT)) {
                     automaticDownload = true;
                     downloadWeather(null);
                     Log.d(LOG_TAG, "time to update after loaded data");
@@ -134,7 +131,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             //If there is a download time to compare to, refresh data after 1 hour
             }else if(!(Coordinates.getApprovedTimeString() == null)) {
-                if(timeForNewDownload(HOURLY_REFRESH_TIMEOUT)) {
+                if(logic.timeForNewDownload(HOURLY_REFRESH_TIMEOUT)) {
                     automaticDownload = true;
                     downloadWeather(null);
                     Log.d(LOG_TAG, "time to update after an hour");
@@ -153,18 +150,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private boolean timeForNewDownload(long timeLimit) {
-        if(Coordinates.getApprovedTimeMillis() == null) {
-            Log.d(LOG_TAG, "No time to compare to");
-            return false;
-        }else if(System.currentTimeMillis() - Coordinates.getApprovedTimeMillis() > timeLimit) {
-            Log.d(LOG_TAG, "Time to update");
-            return true;
-        }else {
-            Log.d(LOG_TAG, "not enough time has passed");
-            return false;
-        }
-    }
 
     @Override
     protected void onStop() {
@@ -191,6 +176,7 @@ public class MainActivity extends AppCompatActivity {
             outState.putString("reply_text", loadedDataTextView.getText().toString());
         }
     }
+
 
     public void downloadWeather(View view) {
         //Get the values for lat and lon depending on what called the download
@@ -224,9 +210,9 @@ public class MainActivity extends AppCompatActivity {
 
         if (networkInfo != null && networkInfo.isConnected()) {
             if (lonQueryString.length() != 0 && latQueryString.length() != 0) {
-                if (validInput(lonQueryString, latQueryString)) {
+                if (logic.validInput(lonQueryString, latQueryString)) {
                     //Create the url with the given lon and lat
-                    String url = createURL(lonQueryString, latQueryString);
+                    String url = logic.createURL(lonQueryString, latQueryString);
 
                     //update lastLon and lastLat
                     lastLon = lonQueryString;
@@ -247,61 +233,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private boolean validInput(String lon, String lat) {
-        try {
-            String dot = ".";
-            float lonFloat = Float.parseFloat(lon);
-            float latFloat = Float.parseFloat(lat);
-
-            String lastLon = Character.toString(lon.charAt(lon.length() - 1));
-            String lastLat = Character.toString(lat.charAt(lat.length() - 1));
-
-            if (lon.contains(dot) && !lastLon.equals(dot) && lat.contains(dot) && !lastLat.equals(dot)) {
-                if(withinRange(lonFloat, latFloat)) {
-                    return true;
-                }else {
-                    showToast("Outside of range");
-                    return false;
-                }
-            } else {
-                showToast("Incorrect input");
-                Log.d(LOG_TAG, "not a float value");
-                return false;
-            }
-        } catch (Exception e) {
-            showToast("Not a float value");
-            Log.d(LOG_TAG, "Unable to parse lon and lat input");
-            return false;
-        }
-    }
-
-    private boolean withinRange(Float lon, Float lat) {
-        //Latitude between -90 and 90
-        //Longitude between -180 and 180
-        if(lon < -180 || lon > 180) {
-            return false;
-        }
-        if(lat < -90 || lat > 90) {
-            return false;
-        }
-
-        return true;
-    }
-
-
-    private String createURL(String lon, String lat) {
-        stringBuilder.delete(0, stringBuilder.length());
-
-        // URL looks like this
-        // https://opendata-download-metfcst.smhi.se/api/category/pmp3g/version/2/geotype/point/lon/15.000/lat/60.000/data.json";
-        stringBuilder.append(WEATHER_URL_BASE);
-        stringBuilder.append(lon);
-        stringBuilder.append("/lat/");
-        stringBuilder.append(lat);
-        stringBuilder.append("/data.json");
-
-        return stringBuilder.toString();
-    }
 
     private void showToast(String message) {
         Toast toast = Toast.makeText(this, message, Toast.LENGTH_SHORT);
